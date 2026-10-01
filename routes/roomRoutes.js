@@ -5,7 +5,8 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const rooms = await Room.find().sort({ createdAt: -1 });
+    const limit = Number(req.query.limit) || 0;
+    const rooms = await Room.find().sort({ createdAt: -1 }).limit(limit);
     res.json(rooms);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
