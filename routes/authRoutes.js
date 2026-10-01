@@ -1,9 +1,17 @@
 import express from "express";
 import bcrypt from "bcryptjs";
-import User from "../models/User.js";
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import authMiddleware from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+};
 
 router.post("/register", async (req, res) => {
   try {
@@ -50,12 +58,6 @@ router.post("/register", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-const cookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
 
 router.post("/login", async (req, res) => {
   try {
@@ -89,6 +91,23 @@ router.post("/login", async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
+});
+
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/logout", (req, res) => {
+  res.clearCookie("token", cookieOptions);
+  res.json({ message: "Logged out" });
 });
 
 export default router;
