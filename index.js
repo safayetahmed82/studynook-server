@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
+import roomRoutes from "./routes/roomRoutes.js";
+
 
 const app = express();
 
@@ -14,6 +16,8 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+
+app.use("/api/rooms", roomRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "StudyNook API is running" });
