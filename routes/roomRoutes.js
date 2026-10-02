@@ -13,6 +13,16 @@ router.get("/", async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+router.get("/mine", authMiddleware, async (req, res) => {
+  try {
+    const rooms = await Room.find({ owner: req.user.id }).sort({
+      createdAt: -1,
+    });
+    res.json(rooms);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 router.get("/:id", async (req, res) => {
   try {
