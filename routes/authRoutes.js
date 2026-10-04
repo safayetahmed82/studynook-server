@@ -3,8 +3,10 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import authMiddleware from "../middleware/authMiddleware.js";
+import { OAuth2Client } from "google-auth-library";
 
 const router = express.Router();
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const cookieOptions = {
   httpOnly: true,
@@ -108,6 +110,53 @@ router.get("/me", authMiddleware, async (req, res) => {
 router.post("/logout", (req, res) => {
   res.clearCookie("token", cookieOptions);
   res.json({ message: "Logged out" });
+});
+router.post("/google", async (req, res) => {
+  try {
+    const { credential } = req.body;
+
+    if (!credential) {
+      return res.status(400).json({ message: "Google login failed" });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+
+    if (!payload.email_verified) {
+      return res.status(400).json({ message: "Google email is not verified" });
+    }
+
+    let user = await User.findOne({ email: payload.email });
+
+    if (!user) {
+      user = await User.create({
+        name: payload.name,
+        email: payload.email,
+        photoURL: payload.picture || "https://i.pravatar.cc/150",
+      });
+    }
+
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
+
+    res.cookie("token", token, cookieOptions);
+
+    res.json({
+      message: "Login successful",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        photoURL: user.photoURL,
+      },
+    });
+  } catch (error) {
+    res.status(401).json({ message: "Google login failed" });
+  }
 });
 
 export default router;
