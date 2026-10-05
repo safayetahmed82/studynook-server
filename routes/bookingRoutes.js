@@ -70,5 +70,53 @@ router.post("/", authMiddleware, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+router.get("/mine", authMiddleware, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ user: req.user.id })
+      .populate("room", "name image")
+      .sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.patch("/:id/cancel", authMiddleware, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    if (booking.user.toString() !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "You can only cancel your own bookings" });
+    }
+
+    if (booking.status === "cancelled") {
+      return res.status(400).json({ message: "Booking is already cancelled" });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (booking.date < today) {
+      return res
+        .status(400)
+        .json({ message: "Past bookings cannot be cancelled" });
+    }
+
+    booking.status = "cancelled";
+    await booking.save();
+
+    await User.findByIdAndUpdate(req.user.id, {
+      $pull: { bookings: booking._id },
+    });
+    await Room.findByIdAndUpdate(booking.room, { $inc: { bookingCount: -1 } });
+
+    res.json(booking);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 export default router;
